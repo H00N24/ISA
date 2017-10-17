@@ -1,7 +1,7 @@
 default: myldap
 
-myldap: myldap.cc
-	g++ myldap.cc -std=c++11 -o myldap
+myldap: myldap.cc server.h server.cc
+	g++ myldap.cc server.h server.cc -std=c++11 -o myldap
 
-clear:
+clean:
 	rm myldap
