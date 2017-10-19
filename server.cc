@@ -1,5 +1,6 @@
-#include <iomanip>
 #include "server.h"
+#include "ldap_fsm.h"
+
 
 void Server::create(int port) {
     socketfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -21,13 +22,12 @@ void Server::start() {
         str = inet_ntoa(clientAddress.sin_addr);
         cout << str << endl;
         int n = read(newfd, buffer, 4096);
-        cout << n << endl;
-        for (int i = 0; i < n; i++)
-        {
-            //cout << hex << buffer[i];
-            printf("%x\n", buffer[i]);
-        }
-        cout << endl;
-
+        LDAP_reciever ldap_recv(string(buffer), n);
+        
+        if (ldap_recv.start())
+            cout << "ok" << endl;
+        else
+            cout << "chyba" << endl;
+        break;
     }
 }
