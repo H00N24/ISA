@@ -33,3 +33,16 @@ public:
     bool unbind_start();
 
 };
+
+class LDAP_sender {
+public:
+    int len, act;
+    int l0;
+    int type;
+    int fd;
+    unsigned char msg[4096] = {0x30, 0, 0x2, 0x1, 0x2,};
+
+    LDAP_sender(int newfd);
+    bool send(int type);
+    bool bind_response();
+};

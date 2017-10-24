@@ -28,7 +28,10 @@ void Server::start() {
             cout << "\n---chyba--" << endl;            
             cout << ldap_recv.act;
             printf(" %d", ldap_recv.msg[ldap_recv.act]);
-        }
+        };
+
+        LDAP_sender ldap_snd(newfd);
+        ldap_snd.send(BINDRESPONSE);
 
         break;
     }

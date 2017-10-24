@@ -103,3 +103,43 @@ bool LDAP_reciever::unbind_start() {
     cout << "Message type: unbind" << endl;
     return true;
 }
+
+LDAP_sender::LDAP_sender(int newfd) {
+    fd = newfd;
+    act = 5;
+}
+
+bool LDAP_sender::send(int type) {
+    switch (type) {
+        case BINDRESPONSE:
+            return bind_response();
+        case SEARCHRESULTENTRY:
+            return true;
+        case SEARCHRESULTDONE:
+            return true;
+        default:
+            return false;
+    }
+}
+
+bool LDAP_sender::bind_response() {
+    msg[act] = BINDRESPONSE;
+    act+=2; // Doplnit velkost 
+    msg[act] = 0x0A;
+    act++;
+    msg[act] = 0x01;
+    act++;
+    msg[act] = 0;
+    act++;
+    msg[1] = act - 2;
+    msg[6] = act - 7;
+    for (int i = 0; i < act; i++)
+    {
+        printf("%x ", msg[i]);
+    }
+    cout << endl;
+
+    int tmp = write(fd, msg, act);
+    cout << tmp << endl;
+    return true;
+}
