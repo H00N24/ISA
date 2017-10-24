@@ -1,5 +1,7 @@
 # Prerequisites
 *.d
+.vscode/*
+myldap
 
 # Compiled Object files
 *.slo

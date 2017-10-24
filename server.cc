@@ -14,20 +14,22 @@ void Server::create(int port) {
 
 void Server::start() {
     string str;
-    char buffer[4096];
     cout << "Server started" << endl;
     while (1) {
         socklen_t sosize  = sizeof(clientAddress);
         newfd = accept(socketfd,(struct sockaddr*)&clientAddress,&sosize);
         str = inet_ntoa(clientAddress.sin_addr);
         cout << str << endl;
-        int n = read(newfd, buffer, 4096);
-        LDAP_reciever ldap_recv(string(buffer), n);
+        LDAP_reciever ldap_recv(newfd);
         
-        if (ldap_recv.start())
-            cout << "ok" << endl;
-        else
-            cout << "chyba" << endl;
+        if (ldap_recv.start() && ldap_recv.message.type == BINDREQUEST) {
+            cout << "Bind request ok" << endl;
+        } else {
+            cout << "\n---chyba--" << endl;            
+            cout << ldap_recv.act;
+            printf(" %d", ldap_recv.msg[ldap_recv.act]);
+        }
+
         break;
     }
 }
