@@ -3,6 +3,21 @@
 LDAP_receiver::LDAP_receiver(int newfd) {
     fd = newfd;
     act = -1;
+    ifstream infile("db.csv");
+    if (!infile.is_open()) {
+        cerr << "Error: Data file" << endl;
+        exit(0);
+    }
+
+    cout << "nacitavam subor" << endl;
+    string cn, uid, mail;
+    while (getline(infile, cn , ';')) {
+        cns.push_back(cn);
+        getline(infile, uid , ';');
+        uids.push_back(uid);
+        getline(infile, mail);
+        mails.push_back(mail);
+    } 
 }
 
 void LDAP_receiver::receive(int newfd) {
@@ -266,7 +281,14 @@ bool LDAP_receiver::equality_match() {
 
     if (ch != 0x30)
         return false;
-
+    if (filter.type == -1) {
+        filter.type = EQUALITY;
+        filter.what = attdesc;
+        filter.value = assertval;
+    } else {
+        // TODO
+        Filter *p = new Filter;
+    }
     return search_end();
 }
 
@@ -277,6 +299,12 @@ bool LDAP_receiver::search_end() {
         return true;
     // TODO dorobit koniec 
 }
+
+
+bool LDAP_receiver::aply_filters() {
+    return true; //TODO
+}
+
 
 bool LDAP_receiver::unbind_start() {
     cout << "Message type: unbind" << endl;

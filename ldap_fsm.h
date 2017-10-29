@@ -1,6 +1,8 @@
 #include <iostream>
 #include <string.h>
 #include <unistd.h>
+#include <vector>
+#include <fstream>
 
 #define DEBUG 1
 
@@ -28,13 +30,25 @@ public:
 
 };
 
+class Filter {
+public:
+    int type = -1;
+    vector<Filter> filters;
+    string what;
+    string value;
+};
+
 class LDAP_receiver {
 public:
     int len; // celkova dlzka prijatej spravy
     int act; // actualna pozicia v stringu
     int fd;
     unsigned char ch;
+    vector<string> cns, uids, mails;
+    vector<string> answer;
     unsigned char msg[4096]; // sprava
+    Filter filter;
+
     
     LDAP_message message;
 
@@ -51,6 +65,9 @@ public:
     bool search_start();
     bool equality_match();
     bool search_end();
+
+
+    bool aply_filters();
 
 
     bool unbind_start();
