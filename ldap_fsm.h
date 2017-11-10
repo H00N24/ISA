@@ -33,9 +33,11 @@ public:
 class Filter {
 public:
     int type = -1;
+    int length;
     vector<Filter> filters;
     string what;
     string value;
+    vector<string> result;
 };
 
 class LDAP_receiver {
@@ -69,8 +71,13 @@ public:
 
     bool aply_filters();
 
-
     bool unbind_start();
+
+private:
+    int get_ll();
+    int get_int();
+    string get_string();
+    Filter get_filter();
 
 };
 

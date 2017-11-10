@@ -45,6 +45,44 @@ void LDAP_receiver::clear() {
     ch = 0;
 }
 
+int LDAP_receiver::get_ll() {
+    int tmp = ch;
+    if (tmp || act != message.l0 + 1)
+        next();    
+    if (tmp < 0x81) {
+        return tmp;        
+    }
+    
+    tmp -= 0x80;
+    int num = 0;
+    for (int i = 0; i < tmp; i++, next()) {
+        num += ch << ((tmp - 1 - i) * 7);
+    }
+    return num;
+}
+
+int LDAP_receiver::get_int() {
+    int tmp = ch;
+    if (tmp < 1 || tmp > 4)
+        return -1;
+    next();
+    
+    int id = 0;
+    for (int i = 0; i < tmp; i++, next()) {
+        id += ch << ((tmp - 1 - i) * 8);
+    }
+    return id;
+}
+
+string LDAP_receiver::get_string() {
+    int len = get_ll();
+    string text = "";
+
+    for (int i = 0; i < len; i++, next()) {
+        text += ch;
+    }
+    return text;
+}
 
 bool LDAP_receiver::start() {
     // 0x30
@@ -55,23 +93,17 @@ bool LDAP_receiver::start() {
     if(DEBUG) cerr << "LDAP message start" << endl;
     next();
 
-    message.l0 = ch;
+    message.l0 = get_ll();
     if(DEBUG) cerr << "Length: " << message.l0 << endl;
-    next();
 
     if (ch != 0x2)
         return false;
     next();
     
-    int tmp = ch;
-    if (tmp < 1 || tmp > 4)
+    message.id = get_int();
+
+    if (message.id < 0)
         return false;
-    next();
-    
-    message.id = 0;
-    for (int i = 0; i < tmp; i++, next()) {
-        message.id += ch << ((tmp - 1 - i) * 8);
-    }
     if(DEBUG) cerr << "Message id: " << message.id << endl;
     
 
@@ -92,8 +124,7 @@ bool LDAP_receiver::bind_start() {
     if(DEBUG) cerr << "Type: Bind" << endl;
     
     next();
-    if(DEBUG) cerr << "Bind len: " << (int)ch << endl;
-    next();
+    if(DEBUG) cerr << "Bind len: " << get_ll() << endl;
 
     if (ch != 0x02)
         return false;
@@ -110,29 +141,14 @@ bool LDAP_receiver::bind_start() {
         return false;
     next();
 
-    int t_len = ch;
-    string text;
-    next();
-
-    for (int i = 0; i < t_len; i++, next()) {
-        text += ch;
-    }
-    if(DEBUG) cerr << "Name (" << t_len << "): " << text << endl;
+    if(DEBUG) cerr << "Name: " << get_string() << endl;
 
     if (ch != 0x80)
         return false;
     next();
 
-    t_len = ch;
-    if (ch)
-        next();
-
-    string simple;
-    for (int i = 0; i < t_len; i++, next()) {
-        simple += ch;
-    }
-    if(DEBUG) cerr << "Simple (" << t_len << "): " << simple << endl;
-
+    if(DEBUG) cerr << "Simple: " << get_string() << endl;    
+    
     if (act == message.l0 + 1)
         return true;
     next();
@@ -146,21 +162,13 @@ bool LDAP_receiver::bind_start() {
 bool LDAP_receiver::search_start() {
     if(DEBUG) cerr << "Message type: search" << endl;    
     next();
-    if(DEBUG) cerr << "Search len: " << (int)ch << endl;
-    next();
+    if(DEBUG) cerr << "Search len: " << get_ll() << endl;
 
     if (ch != 0x04)
         return false;
     next();
     
-    int t_len = ch;
-    next();
-
-    string baseobject;
-    for (int i = 0; i < t_len; i++, next()) {
-        baseobject += ch;
-    }
-    if(DEBUG) cerr << "BaseObject (" << t_len << "): " << baseobject << endl;
+    if(DEBUG) cerr << "BaseObject: " << get_string() << endl;
 
     if (ch != 0x0A)
         return false;
@@ -192,30 +200,14 @@ bool LDAP_receiver::search_start() {
         return false;
     next();
 
-    int tmp = ch;
-    if (tmp < 1 || tmp > 4)
-        return false;
-    next();
-    
-    message.size_limit = 0;
-    for (int i = 0; i < tmp; i++, next()) {
-        message.size_limit += ch << ((tmp - 1 - i) * 8);
-    }
+    message.size_limit = get_int();
     if(DEBUG) cerr << "Size limit: " << message.id << endl;
 
     if (ch != 0x02)
         return false;
     next();
-    
-    tmp = ch;
-    if (tmp < 1 || tmp > 4)
-        return false;
-    next();
-    
-    message.time_limit = 0;
-    for (int i = 0; i < tmp; i++, next()) {
-        message.time_limit += ch << ((tmp - 1 - i) * 8);
-    }
+
+    message.time_limit = get_int();    
     if(DEBUG) cerr << "Time limit: " << message.id << endl;
 
     if (ch != 0x01)
@@ -229,55 +221,94 @@ bool LDAP_receiver::search_start() {
     if(DEBUG) cerr << "TypesOnly: " << (int)ch << endl;
     next();
 
-    switch (ch) {
-        case AND:
-            return false;
-        case OR:
-            return false;
-        case NOT:
-            return false;
-        case SUBSTRING:
-            return false;
-        case EQUALITY:
-            return equality_match();
-        default:
-            return false; 
+    filter = get_filter();
+    if (filter.type == -1) {
+        return false;
     }
 
     return true;
 }
 
+Filter LDAP_receiver::get_filter() {
+    Filter f;
+    f.type = ch;
+    if(DEBUG) cerr << "Filter type: ";
+    switch (f.type) {
+        case EQUALITY:
+            if(DEBUG) cerr << "Equality" << endl;
+            break;
+        case SUBSTRING:
+            if(DEBUG) cerr << "Substring" << endl;
+            break;
+        case AND:
+            if(DEBUG) cerr << "and" << endl;
+            break;
+        case OR:
+            if(DEBUG) cerr << "Or" << endl;
+            break;
+        case NOT:
+            if(DEBUG) cerr << "Neg" << endl;
+            break;
+        default:
+            if(DEBUG) cerr << "Unknown" << endl;
+        return f;
+    }
+    next();
+    f.length = get_ll();
+    if(DEBUG) cerr << "Length: " << f.length << endl;
+    
+    if (f.type != EQUALITY && f.type != SUBSTRING) {
+        int tmp_len = f.length;
+        while (tmp_len) {
+            f.filters.push_back(get_filter());
+            tmp_len -= 2 + f.filters.back().length;          
+        }
+    }
+
+    if (f.type == EQUALITY) {   
+        if (ch != 0x04) {
+            f.type = -1;
+            return f;            
+        }
+        next();
+
+        f.what = get_string();
+        if(DEBUG) cerr << "AttributeDesc: " << f.what << endl;
+
+        if (ch != 0x04) {
+            f.type = -1;
+            return f;            
+        }
+        next();
+
+        f.value = get_string();
+        if(DEBUG) cerr << "AssertValue: " << f.value << endl;
+    }
+
+    if (f.type == SUBSTRING) {
+
+    }
+    return f;
+}
+
 bool LDAP_receiver::equality_match() {
     if(DEBUG) cerr << "Filter type: equality" << endl;
     next();
-    if(DEBUG) cerr << "Length: " << (int)ch << endl;
-    next();
+    if(DEBUG) cerr << "Length: " << get_ll() << endl;
 
     if (ch != 0x04)
         return false;
     next();
 
-    int t_len = ch;
-    next();
-
-    string attdesc;
-    for (int i = 0; i < t_len; i++, next()) {
-        attdesc += ch;
-    }
-    if(DEBUG) cerr << "AttributeDesc (" << t_len << "): " << attdesc << endl;
+    string attdesc = get_string();
+    if(DEBUG) cerr << "AttributeDesc: " << attdesc << endl;
 
     if (ch != 0x04)
         return false;
     next();
 
-    t_len = ch;
-    next();
-
-    string assertval;
-    for (int i = 0; i < t_len; i++, next()) {
-        assertval += ch;
-    }
-    if(DEBUG) cerr << "AssertValue (" << t_len << "): " << assertval << endl;
+    string assertval = get_string();
+    if(DEBUG) cerr << "AssertValue: " << assertval << endl;
 
     if (ch != 0x30)
         return false;
