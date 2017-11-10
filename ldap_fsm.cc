@@ -286,7 +286,55 @@ Filter LDAP_receiver::get_filter() {
     }
 
     if (f.type == SUBSTRING) {
+        /*
+        if (ch != 0x30) {
+            f.type = -1;
+            return f;            
+        }
+        next();
 
+        if(DEBUG) cerr << "AssertValue: " << get_ll() << endl;        
+        */
+        if (ch != 0x04) {
+            f.type = -1;
+            return f;            
+        }
+        next();
+
+        f.what = get_string();
+        if(DEBUG) cerr << "AttributeDesc: " << f.what << endl;
+
+        if (ch != 0x30) {
+            f.type = -1;
+            return f;            
+        }
+        next();
+
+        int tmp_len = get_ll();
+        string tmp_str;
+        while(tmp_len) {
+            unsigned char val = ch;
+            next();
+
+            tmp_str = get_string();
+            switch (val) {
+                case 0x80:
+                    f.value += tmp_str + ".*";
+                    break;
+                case 0x81:
+                    f.value += ".*" + tmp_str + ".*";
+                    break;
+                case 0x82:
+                    f.value += ".*" + tmp_str;
+                    break;
+                default:
+                    f.type = -1;
+                    return f;
+            }
+            
+            tmp_len -= 2 + tmp_str.length();
+        }
+        if(DEBUG) cerr << "AssertValue: " << f.value << endl;        
     }
     return f;
 }
