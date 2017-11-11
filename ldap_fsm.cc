@@ -24,8 +24,8 @@ bool LDAP_parser::start() {
     if(DEBUG) cerr << "LDAP message start" << endl;
     next();
 
-    message.l0 = get_ll();
-    if(DEBUG) cerr << "Length: " << message.l0 << endl;
+    message.length = get_ll();
+    if(DEBUG) cerr << "Length: " << message.length << endl;
 
     if (ch != 0x2)
         return false;
@@ -83,13 +83,13 @@ bool LDAP_parser::bind_req() {
     string simple = get_string();
     if(DEBUG) cerr << "Simple: " << simple << endl;    
     
-    if (act == message.l0 + 1) {
+    if (act == message.length + 1) {
         bind_response();
         return true;
     }
     next();
 
-    if (ch == 0xA0 && act == message.l0 + 1) {
+    if (ch == 0xA0 && act == message.length + 1) {
         bind_response();
         return true;      
     }
@@ -175,14 +175,14 @@ bool LDAP_parser::search_req() {
         }
     }
     
-    if (act == message.l0) {
+    if (act == message.length) {
         search_entry();
         search_res_done();
         return true;
     }
     next();
 
-    if (ch == 0xA0 && act == message.l0) {
+    if (ch == 0xA0 && act == message.length) {
         search_entry();
         search_res_done();
         return true;      

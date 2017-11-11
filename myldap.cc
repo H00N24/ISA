@@ -1,7 +1,5 @@
-#include <iostream>
 #include "server.h"
 
-#define PORT 389
 
 using namespace std;
 

@@ -2,7 +2,7 @@
 
 int LDAP_parser::get_ll() {
     int tmp = ch;
-    if (tmp || act != message.l0 + 1)
+    if (tmp || act != message.length + 1)
         next();    
     if (tmp < 0x81) {
         return tmp;        

@@ -14,5 +14,7 @@ myldap: $(HEAD) $(SRC)
 debug: $(HEAD) $(SRC)
 	$(CXX) $(FLAGS) -DNDEBUG $^ -o myldap
 
+tar:
+	tar -cf xkurak00.tar manual.pdf $(SRC) $(HEAD) Makefile
 clean:
 	rm myldap

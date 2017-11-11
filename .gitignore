@@ -2,6 +2,7 @@
 *.d
 .vscode/*
 myldap
+xkurak00.tar
 
 # Compiled Object files
 *.slo
