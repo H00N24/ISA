@@ -2,37 +2,32 @@
 
 LDAP_receiver::LDAP_receiver(int newfd) {
     fd = newfd;
-    act = -1;
     ifstream infile("db.csv");
     if (!infile.is_open()) {
         cerr << "Error: Data file" << endl;
         exit(0);
     }
 
-    cout << "nacitavam subor" << endl;
+    if(DEBUG) cerr << "CSV loading" << endl;
     string cn, uid, mail;
+
     while (getline(infile, cn , ';')) {
-        cns.push_back(cn);
+        vector<string> tmp;
+        tmp.push_back(cn);    
         getline(infile, uid , ';');
-        uids.push_back(uid);
+        tmp.push_back(uid);
         getline(infile, mail);
-        mails.push_back(mail);
-    } 
-}
+        tmp.push_back(mail);
 
-void LDAP_receiver::receive(int newfd) {
-    memset(msg, 0, sizeof(msg));
-    fd = newfd;
-    len = read(newfd, msg, 4095);
-    act = 0;
-
-    cout << len << endl;
-    for (int i = 0; i < len; i++)
-    {
-        //char a = *(msg + i);
-        printf("%x ", msg[i]);
+        data.emplace(tmp);
     }
-    cout << endl;
+    clear();
+    /*
+    for (auto i: test_data) {
+        cout << i[0] << " " << i[1] << " " << i[2] << endl; 
+    }
+    exit(1);
+    */
 }
 
 void LDAP_receiver::next() {
@@ -43,45 +38,6 @@ void LDAP_receiver::next() {
 void LDAP_receiver::clear() {
     act = -1;
     ch = 0;
-}
-
-int LDAP_receiver::get_ll() {
-    int tmp = ch;
-    if (tmp || act != message.l0 + 1)
-        next();    
-    if (tmp < 0x81) {
-        return tmp;        
-    }
-    
-    tmp -= 0x80;
-    int num = 0;
-    for (int i = 0; i < tmp; i++, next()) {
-        num += ch << ((tmp - 1 - i) * 7);
-    }
-    return num;
-}
-
-int LDAP_receiver::get_int() {
-    int tmp = ch;
-    if (tmp < 1 || tmp > 4)
-        return -1;
-    next();
-    
-    int id = 0;
-    for (int i = 0; i < tmp; i++, next()) {
-        id += ch << ((tmp - 1 - i) * 8);
-    }
-    return id;
-}
-
-string LDAP_receiver::get_string() {
-    int len = get_ll();
-    string text = "";
-
-    for (int i = 0; i < len; i++, next()) {
-        text += ch;
-    }
-    return text;
 }
 
 bool LDAP_receiver::start() {
@@ -226,162 +182,8 @@ bool LDAP_receiver::search_start() {
         return false;
     }
 
+    print_filters(filter);
     return true;
-}
-
-Filter LDAP_receiver::get_filter() {
-    Filter f;
-    f.type = ch;
-    if(DEBUG) cerr << "Filter type: ";
-    switch (f.type) {
-        case EQUALITY:
-            if(DEBUG) cerr << "Equality" << endl;
-            break;
-        case SUBSTRING:
-            if(DEBUG) cerr << "Substring" << endl;
-            break;
-        case AND:
-            if(DEBUG) cerr << "and" << endl;
-            break;
-        case OR:
-            if(DEBUG) cerr << "Or" << endl;
-            break;
-        case NOT:
-            if(DEBUG) cerr << "Neg" << endl;
-            break;
-        default:
-            if(DEBUG) cerr << "Unknown" << endl;
-        return f;
-    }
-    next();
-    f.length = get_ll();
-    if(DEBUG) cerr << "Length: " << f.length << endl;
-    
-    if (f.type != EQUALITY && f.type != SUBSTRING) {
-        int tmp_len = f.length;
-        while (tmp_len) {
-            f.filters.push_back(get_filter());
-            tmp_len -= 2 + f.filters.back().length;          
-        }
-    }
-
-    if (f.type == EQUALITY) {   
-        if (ch != 0x04) {
-            f.type = -1;
-            return f;            
-        }
-        next();
-
-        f.what = get_string();
-        if(DEBUG) cerr << "AttributeDesc: " << f.what << endl;
-
-        if (ch != 0x04) {
-            f.type = -1;
-            return f;            
-        }
-        next();
-
-        f.value = get_string();
-        if(DEBUG) cerr << "AssertValue: " << f.value << endl;
-    }
-
-    if (f.type == SUBSTRING) {
-        /*
-        if (ch != 0x30) {
-            f.type = -1;
-            return f;            
-        }
-        next();
-
-        if(DEBUG) cerr << "AssertValue: " << get_ll() << endl;        
-        */
-        if (ch != 0x04) {
-            f.type = -1;
-            return f;            
-        }
-        next();
-
-        f.what = get_string();
-        if(DEBUG) cerr << "AttributeDesc: " << f.what << endl;
-
-        if (ch != 0x30) {
-            f.type = -1;
-            return f;            
-        }
-        next();
-
-        int tmp_len = get_ll();
-        string tmp_str;
-        while(tmp_len) {
-            unsigned char val = ch;
-            next();
-
-            tmp_str = get_string();
-            switch (val) {
-                case 0x80:
-                    f.value += tmp_str + ".*";
-                    break;
-                case 0x81:
-                    f.value += ".*" + tmp_str + ".*";
-                    break;
-                case 0x82:
-                    f.value += ".*" + tmp_str;
-                    break;
-                default:
-                    f.type = -1;
-                    return f;
-            }
-            
-            tmp_len -= 2 + tmp_str.length();
-        }
-        if(DEBUG) cerr << "AssertValue: " << f.value << endl;        
-    }
-    return f;
-}
-
-bool LDAP_receiver::equality_match() {
-    if(DEBUG) cerr << "Filter type: equality" << endl;
-    next();
-    if(DEBUG) cerr << "Length: " << get_ll() << endl;
-
-    if (ch != 0x04)
-        return false;
-    next();
-
-    string attdesc = get_string();
-    if(DEBUG) cerr << "AttributeDesc: " << attdesc << endl;
-
-    if (ch != 0x04)
-        return false;
-    next();
-
-    string assertval = get_string();
-    if(DEBUG) cerr << "AssertValue: " << assertval << endl;
-
-    if (ch != 0x30)
-        return false;
-    if (filter.type == -1) {
-        filter.type = EQUALITY;
-        filter.what = attdesc;
-        filter.value = assertval;
-    } else {
-        // TODO
-        Filter *p = new Filter;
-    }
-    return search_end();
-}
-
-bool LDAP_receiver::search_end() {
-    next();
-    int n_len = ch;
-    if (!len)
-        return true;
-    // TODO dorobit koniec 
-}
-
-
-bool LDAP_receiver::aply_filters() {
-    return true; //TODO
 }
 
 

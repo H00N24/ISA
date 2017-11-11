@@ -3,6 +3,9 @@
 #include <unistd.h>
 #include <vector>
 #include <fstream>
+#include <map>
+#include <regex>
+#include <set>
 
 #define DEBUG 1
 
@@ -46,8 +49,7 @@ public:
     int act; // actualna pozicia v stringu
     int fd;
     unsigned char ch;
-    vector<string> cns, uids, mails;
-    vector<string> answer;
+    set< vector<string>> data;
     unsigned char msg[4096]; // sprava
     Filter filter;
 
@@ -55,7 +57,6 @@ public:
     LDAP_message message;
 
     LDAP_receiver(int newfd);
-    void receive(int newfd);
     void next();
     void clear();
     bool start(); // 0x30, LL, 0x2, 0-4, message_id
@@ -65,19 +66,19 @@ public:
 
     // search request
     bool search_start();
-    bool equality_match();
-    bool search_end();
-
-
-    bool aply_filters();
 
     bool unbind_start();
 
 private:
+    // ber_functions.cc
     int get_ll();
     int get_int();
     string get_string();
+
+    // filters.cc
     Filter get_filter();
+    void print_filters(Filter f);
+    vector<string> resolve_filters();
 
 };
 
