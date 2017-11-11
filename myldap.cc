@@ -6,7 +6,7 @@
 using namespace std;
 
 int main(int argc, char *argv[]) {
-    Server serv;
-    serv.create(PORT);
+    
+    Server serv(PORT, "db.csv");
     serv.start();
 }

@@ -9,20 +9,23 @@
 #include <sys/stat.h>
 #include <netinet/in.h>
 #include <thread>
+#include <vector>
+#include <set>
 
 
 using namespace std;
 
+void start_ldap(int newfd, set<vector<string>> data);
+
 class Server {
     public:
-        int socketfd, newfd, rv;
-        struct sockaddr_in serverAddress;
-        struct sockaddr_in clientAddress;
-        char msg[4096];
+        int fd, new_fd, rv;
+        struct sockaddr_in adr;
+        set<vector<string>> data;
 
-
-
-        void create(int port);
+        Server(int port, string file_name);
         void start();
+
+        string trim(string s);
 
 };

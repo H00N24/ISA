@@ -1,35 +1,7 @@
 #include "ldap_fsm.h"
 
 
-void LDAP_receiver::print_filters(Filter f) {
-    switch (f.type) {
-        case EQUALITY:
-            if(DEBUG) cerr << "Equality ";
-            break;
-        case SUBSTRING:
-            if(DEBUG) cerr << "Substring ";
-            break;
-        case AND:
-            if(DEBUG) cerr << "And ";
-            break;
-        case OR:
-            if(DEBUG) cerr << "Or ";
-            break;
-        case NOT:
-            if(DEBUG) cerr << "Neg ";
-            break;
-        default:
-            if(DEBUG) cerr << "Unknown ";
-    }
-    cout << f.filters.size() << endl;
-        
-    for (auto i: f.filters) {
-        cout << "-> ";
-        print_filters(i);
-    }
-}
-
-Filter LDAP_receiver::get_filter() {
+Filter LDAP_parser::get_filter() {
     Filter f;
     f.type = ch;
     if(DEBUG) cerr << "Filter type: ";
@@ -64,37 +36,37 @@ Filter LDAP_receiver::get_filter() {
             tmp_len -= 2 + f.filters.back().length;          
         }
     }
-
-    if (f.type == EQUALITY) {   
-        if (ch != 0x04) {
+    
+    if (f.type == EQUALITY) {
+         if (ch != 0x04) {
             f.type = -1;
             return f;            
         }
         next();
 
         f.what = get_string();
+        f.w = f.known[f.what];
         if(DEBUG) cerr << "AttributeDesc: " << f.what << endl;
+            if (ch != 0x04) {
+                f.type = -1;
+                return f;            
+            }
+            next();
 
-        if (ch != 0x04) {
-            f.type = -1;
-            return f;            
-        }
-        next();
-
-        f.value = get_string();
-        if(DEBUG) cerr << "AssertValue: " << f.value << endl;
+            f.value = get_string();
+            if(DEBUG) cerr << "AssertValue: " << f.value << endl;
     }
 
     if (f.type == SUBSTRING) {
-        if (ch != 0x04) {
+         if (ch != 0x04) {
             f.type = -1;
             return f;            
         }
         next();
 
         f.what = get_string();
+        f.w = f.known[f.what];
         if(DEBUG) cerr << "AttributeDesc: " << f.what << endl;
-
         if (ch != 0x30) {
             f.type = -1;
             return f;            
@@ -128,4 +100,73 @@ Filter LDAP_receiver::get_filter() {
         if(DEBUG) cerr << "AssertValue: " << f.value << endl;        
     }
     return f;
+}
+
+void LDAP_parser::print_filters(Filter f) {
+    switch (f.type) {
+        case EQUALITY:
+            if(DEBUG) cerr << "Equality ";
+            break;
+        case SUBSTRING:
+            if(DEBUG) cerr << "Substring ";
+            break;
+        case AND:
+            if(DEBUG) cerr << "And ";
+            break;
+        case OR:
+            if(DEBUG) cerr << "Or ";
+            break;
+        case NOT:
+            if(DEBUG) cerr << "Neg ";
+            break;
+        default:
+            if(DEBUG) cerr << "Unknown ";
+    }
+    if(DEBUG) cerr << f.filters.size() << endl;
+        
+    for (auto i: f.filters) {
+        if(DEBUG) cerr << "-> ";
+        print_filters(i);
+    }
+}
+
+set<vector<string>> LDAP_parser::resolve_filters(Filter f) {
+    set<vector<string>> result;
+    if (f.type == EQUALITY || f.type == SUBSTRING) {
+        for (auto i: data) {
+            if (regex_match(i[f.w], regex(f.value, ECMAScript | icase))) {
+                result.emplace(i);
+            }
+        }
+    }
+
+    if (f.type == NOT) {
+        set<vector<string>> tmp = resolve_filters(f.filters[0]);
+        for (auto i: data) {
+            if (tmp.find(i) == tmp.end()) {
+                result.emplace(i);
+            }
+        }
+    }
+
+    if (f.type == OR) {
+        for (auto i: f.filters) {
+            set<vector<string>> tmp = resolve_filters(i);
+            result.insert(tmp.begin(), tmp.end());
+        }
+    }
+
+    if (f.type == AND) {
+        result = resolve_filters(f.filters[0]);
+        for (auto i: f.filters) {
+            set<vector<string>> tmp = resolve_filters(i);
+            set<vector<string>> tmp1 = result;
+            result.clear();
+            set_intersection(tmp1.begin(), tmp1.end(),
+                             tmp.begin(), tmp.end(),
+                             inserter(result, result.begin()));            
+        }
+    }
+
+    return result;
 }

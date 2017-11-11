@@ -1,48 +1,23 @@
 #include "ldap_fsm.h"
 
-LDAP_receiver::LDAP_receiver(int newfd) {
+LDAP_parser::LDAP_parser(int newfd, set<vector<string>> d) {
     fd = newfd;
-    ifstream infile("db.csv");
-    if (!infile.is_open()) {
-        cerr << "Error: Data file" << endl;
-        exit(0);
-    }
-
-    if(DEBUG) cerr << "CSV loading" << endl;
-    string cn, uid, mail;
-
-    while (getline(infile, cn , ';')) {
-        vector<string> tmp;
-        tmp.push_back(cn);    
-        getline(infile, uid , ';');
-        tmp.push_back(uid);
-        getline(infile, mail);
-        tmp.push_back(mail);
-
-        data.emplace(tmp);
-    }
+    data = d;
     clear();
-    /*
-    for (auto i: test_data) {
-        cout << i[0] << " " << i[1] << " " << i[2] << endl; 
-    }
-    exit(1);
-    */
 }
 
-void LDAP_receiver::next() {
+void LDAP_parser::next() {
     read(fd, &ch, 1);
     act++;
 }
 
-void LDAP_receiver::clear() {
+void LDAP_parser::clear() {
     act = -1;
     ch = 0;
 }
 
-bool LDAP_receiver::start() {
-    // 0x30
-
+bool LDAP_parser::start() {
+    clear();
     next();
     if (ch != 0x30)
         return false;
@@ -66,21 +41,22 @@ bool LDAP_receiver::start() {
     message.type = ch;
     switch (message.type) {
         case BINDREQUEST:
-            return bind_start();
+            return bind_req();
         case SEARCHREQEST:
-            return search_start();
+            return search_req();
         case UNBINDREQUEST:
-            return unbind_start();
+            return unbind_req();
         default:
             return false;
     }
 }
 
-bool LDAP_receiver::bind_start() {
+bool LDAP_parser::bind_req() {
     if(DEBUG) cerr << "Type: Bind" << endl;
     
     next();
-    if(DEBUG) cerr << "Bind len: " << get_ll() << endl;
+    int ll = get_ll();
+    if(DEBUG) cerr << "Bind len: " << ll << endl;
 
     if (ch != 0x02)
         return false;
@@ -97,34 +73,42 @@ bool LDAP_receiver::bind_start() {
         return false;
     next();
 
-    if(DEBUG) cerr << "Name: " << get_string() << endl;
+    string name = get_string();
+    if(DEBUG) cerr << "Name: " << name << endl;
 
     if (ch != 0x80)
         return false;
     next();
 
-    if(DEBUG) cerr << "Simple: " << get_string() << endl;    
+    string simple = get_string();
+    if(DEBUG) cerr << "Simple: " << simple << endl;    
     
-    if (act == message.l0 + 1)
+    if (act == message.l0 + 1) {
+        bind_response();
         return true;
+    }
     next();
 
-    if (ch == 0xA0 && act == message.l0)
-        return true;
+    if (ch == 0xA0 && act == message.l0 + 1) {
+        bind_response();
+        return true;      
+    }
 
     return false;
 }
 
-bool LDAP_receiver::search_start() {
+bool LDAP_parser::search_req() {
     if(DEBUG) cerr << "Message type: search" << endl;    
     next();
-    if(DEBUG) cerr << "Search len: " << get_ll() << endl;
+    int ll = get_ll();
+    if(DEBUG) cerr << "Search len: " << ll << endl;
 
     if (ch != 0x04)
         return false;
     next();
     
-    if(DEBUG) cerr << "BaseObject: " << get_string() << endl;
+    string base = get_string();
+    if(DEBUG) cerr << "BaseObject: " << base << endl;
 
     if (ch != 0x0A)
         return false;
@@ -157,14 +141,14 @@ bool LDAP_receiver::search_start() {
     next();
 
     message.size_limit = get_int();
-    if(DEBUG) cerr << "Size limit: " << message.id << endl;
+    if(DEBUG) cerr << "Size limit: " << message.size_limit << endl;
 
     if (ch != 0x02)
         return false;
     next();
 
     message.time_limit = get_int();    
-    if(DEBUG) cerr << "Time limit: " << message.id << endl;
+    if(DEBUG) cerr << "Time limit: " << message.time_limit << endl;
 
     if (ch != 0x01)
         return false;
@@ -182,56 +166,76 @@ bool LDAP_receiver::search_start() {
         return false;
     }
 
-    print_filters(filter);
-    return true;
-}
+    if(DEBUG) print_filters(filter);
 
-
-bool LDAP_receiver::unbind_start() {
-    cout << "Message type: unbind" << endl;
-    return true;
-}
-
-LDAP_sender::LDAP_sender(int newfd) {
-    fd = newfd;
-    act = 5;
-}
-
-bool LDAP_sender::send(int type) {
-    switch (type) {
-        case BINDRESPONSE:
-            return bind_response();
-        case SEARCHRESULTENTRY:
-            return true;
-        case SEARCHRESULTDONE:
-            return true;
-        default:
-            return false;
+    res_set = resolve_filters(filter);
+    if(DEBUG) {
+        for (auto i: res_set) {
+            cerr << i[0] << " " << i[1] << " " << i[2] << endl; 
+        }
     }
+    
+    if (act == message.l0) {
+        search_entry();
+        search_res_done();
+        return true;
+    }
+    next();
+
+    if (ch == 0xA0 && act == message.l0) {
+        search_entry();
+        search_res_done();
+        return true;      
+    }
+
+    return false;
 }
 
-bool LDAP_sender::bind_response() {
-    msg[act] = BINDRESPONSE;
-    act+=2; // Doplnit velkost 
-    msg[act] = 0x0A;
-    act++;
-    msg[act] = 0x01;
-    act++;
-    msg[act] = 0;
-    act++;
-    msg[act] = 0x4;
-    act+=2;
-    msg[act] =0x4;
-    act+=2;
-    msg[1] = act - 2;
-    msg[6] = act - 7;
-    for (int i = 0; i < act; i++)
-    {
-        printf("%x ", msg[i]);
-    }
-    cout << endl;
 
-    int tmp = write(fd, msg, act);
-    cout << tmp << endl;
-    return true;
+bool LDAP_parser::unbind_req() {
+    if(DEBUG) cerr << "Message type: unbind" << endl;
+    return false;
+}
+
+void LDAP_parser::bind_response() {
+    string res = {0x0A, 0x01, 0x00, 0x04, 0x00, 0x04, 0x00};
+    res = cn(0x61) + make_ll(res);
+    res = cn(0x02) + make_id(message.id) + res;
+    res = cn(0x30) + make_ll(res);
+
+    write(fd, res.c_str(), res.length());
+}
+
+void LDAP_parser::search_entry() {
+    vector <string> wh = { "cn", "uid", "mail"};
+    for (auto i: res_set) {
+        string res = "";
+        for (int a = 0; a < 3; a++) {
+            string value = cn(0x04) + make_ll(i[a]); // 0x04 ll meno
+            value = cn(0x31) + make_ll(value);
+            string what = cn(0x04) + make_ll(wh[a]);
+            res += cn(0x30) + make_ll(what + value);
+        }
+        res = cn(0x30) + make_ll(res);
+        string name = "uid=" + i[1];
+        name = cn(0x04) + make_ll(name);
+
+        res = cn(0x64) + make_ll(name + res);
+        res = cn(0x02) + make_id(message.id) + res;
+        res = cn(0x30) + make_ll(res);
+
+        write(fd, res.c_str(), res.length());
+        message.size_limit -= 1;
+        if (!message.size_limit)
+            break;
+    }        
+}
+
+void LDAP_parser::search_res_done() {
+    string res = {0x0A, 0x01, 0x00, 0x04, 0x00, 0x04, 0x00};
+    res = cn(0x65) + make_ll(res);
+    res = cn(0x02) + make_id(message.id) + res;
+    res = cn(0x30) + make_ll(res);
+
+    write(fd, res.c_str(), res.length());
 }
