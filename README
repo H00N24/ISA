@@ -42,7 +42,7 @@ Makefile prepinace:
 * server.cc - paralelny server
 * ldap_fsm.cc - stavovy automat na spracovanie LDAP sprav
 * filters.cc - spracovanie LDAP filtrov
-* ber_functions.cc - spracovie BER
+* ber_functions.cc - spracovie ASN.1
 
 ### Hlavickove subory
 * ldap_fsm.h - pre ldap_fsm.cc, filters.cc, ber_functions.cc
