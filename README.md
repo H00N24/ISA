@@ -1,5 +1,5 @@
 # ISA - LDAP server
-Implementacia jednoucheho, paralelneho LDAP serveru.
+Implementacia jednoducheho, paralelneho LDAP serveru.
 Server podporuje LDAPv2 (simple bind).
 Server podporuje spravy BindRequest, SearchRequest, UnBindRequest. Ine spravy su ingnorovane, a spojenie je ukoncene.
 Server odpoveda spravamy BindResponse, SearchResEntry, SearchResDone.
