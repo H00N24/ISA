@@ -56,6 +56,10 @@ Filter LDAP_parser::get_filter() {
         next();
 
         f.what = get_string();
+        transform(f.what.begin(),
+                  f.what.end(),
+                  f.what.begin(),
+                  ::tolower);
         f.w = f.known[f.what];
         if(DEBUG) cerr << "AttributeDesc: " << f.what << endl;
             if (ch != 0x04) {
@@ -76,6 +80,10 @@ Filter LDAP_parser::get_filter() {
         next();
 
         f.what = get_string();
+        transform(f.what.begin(),
+                  f.what.end(),
+                  f.what.begin(),
+                  ::tolower);
         f.w = f.known[f.what];
         if(DEBUG) cerr << "AttributeDesc: " << f.what << endl;
         if (ch != 0x30) {

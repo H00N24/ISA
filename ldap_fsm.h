@@ -15,6 +15,7 @@
 #include <map>
 #include <regex>
 #include <set>
+#include <algorithm>
 
 /**
  * Macro for debuging (make debug) 
