@@ -1,7 +1,18 @@
+/**
+ * server.cc
+ * LDAP server - ISA 2017/2018
+ * Author: Ondrej Kurak
+ * Mail: xkurak00@stud.fit.vutbr.cz
+ **/
+
 #include "server.h"
 #include "ldap_fsm.h"
 
-
+/** Constructor
+ * Server constructor
+ * @param port 
+ * @param name of db file
+*/
 Server::Server(int port, string file_name) {
     fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (fd == -1) {
@@ -45,6 +56,10 @@ Server::Server(int port, string file_name) {
     }
 }
 
+/** Start of server
+ * Starts server and listens for connections,
+ * generates new thread for new connection
+*/
 void Server::start() {
     string str;
     cout << "Server started" << endl;
@@ -60,12 +75,22 @@ void Server::start() {
     }
 }
 
+/** Starting LDAP parser
+ * Starts LDAP parser
+ * @param socket file descriptor
+ * @param data from input file
+ **/
 void start_ldap(int new_fd, set<vector<string>> data) {
     LDAP_parser ldap_recv(new_fd, data);
     while (ldap_recv.start());
     close(new_fd);
 }
 
+/** Triming of string
+ * Trims string
+ * @param input
+ * @return trimmed string
+*/
 string Server::trim(string s) {
     const char* t = " \t\n\r\f\v";
     string tmp = s.erase(0, s.find_first_not_of(t));

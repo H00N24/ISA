@@ -1,21 +1,44 @@
+/**
+ * ldap_fsm.cc
+ * LDAP server - ISA 2017/2018
+ * Author: Ondrej Kurak
+ * Mail: xkurak00@stud.fit.vutbr.cz
+ **/
+
 #include "ldap_fsm.h"
 
+/** Constructor
+* Initialization of LDAP_parser.
+* @param newfd file descriptor
+* @param d data with cn, uid, mail
+**/
 LDAP_parser::LDAP_parser(int newfd, set<vector<string>> d) {
     fd = newfd;
     data = d;
     clear();
 }
 
-void LDAP_parser::next() {
-    read(fd, &ch, 1);
-    act++;
-}
-
+/** BindRequest parsing
+ * Verification of BindReqest, sends BindResponse
+ * @return true if successful
+**/
 void LDAP_parser::clear() {
     act = -1;
     ch = 0;
 }
 
+/** Next char of message
+ * Reads next char from message and inc act
+**/
+void LDAP_parser::next() {
+    read(fd, &ch, 1);
+    act++;
+}
+
+/** Start of parsing
+ * Starts parsing common part of LDAP messages
+ * @return true if successful
+**/
 bool LDAP_parser::start() {
     clear();
     next();
@@ -51,6 +74,10 @@ bool LDAP_parser::start() {
     }
 }
 
+/** BindRequest parsing
+ * Verification of BindReqest, sends BindResponse
+ * @return true if successful
+**/
 bool LDAP_parser::bind_req() {
     if(DEBUG) cerr << "Type: Bind" << endl;
     
@@ -97,6 +124,12 @@ bool LDAP_parser::bind_req() {
     return false;
 }
 
+/** SearchRequest parsing
+ * Verification of SearchRequest and filtes.
+ * Resolve filtes and sends SearchResEntry
+ * for every result in res_set and SearchResDone.
+ * @return true if successful
+**/
 bool LDAP_parser::search_req() {
     if(DEBUG) cerr << "Message type: search" << endl;    
     next();
@@ -176,14 +209,14 @@ bool LDAP_parser::search_req() {
     }
     
     if (act == message.length) {
-        search_entry();
+        search_res_entry();
         search_res_done();
         return true;
     }
     next();
 
     if (ch == 0xA0 && act == message.length) {
-        search_entry();
+        search_res_entry();
         search_res_done();
         return true;      
     }
@@ -191,12 +224,18 @@ bool LDAP_parser::search_req() {
     return false;
 }
 
-
+/** UnBindRequest parsing
+ * Verification of UnBindRequest 
+ * @return false ending connection
+**/
 bool LDAP_parser::unbind_req() {
     if(DEBUG) cerr << "Message type: unbind" << endl;
     return false;
 }
 
+/** BindResponse generator/sender
+ * Generates and sends BindResponse
+**/
 void LDAP_parser::bind_response() {
     string res = {0x0A, 0x01, 0x00, 0x04, 0x00, 0x04, 0x00};
     res = cn(0x61) + make_ll(res);
@@ -206,8 +245,12 @@ void LDAP_parser::bind_response() {
     write(fd, res.c_str(), res.length());
 }
 
-void LDAP_parser::search_entry() {
-    vector <string> wh = { "cn", "uid", "mail"};
+/** SearchResEntry generator/sender
+ * Generates and sends SearchResEntry for
+ * every result in res_set
+**/
+void LDAP_parser::search_res_entry() {
+    vector <string> wh = {"cn", "uid", "mail"};
     for (auto i: res_set) {
         string res = "";
         for (int a = 0; a < 3; a++) {
@@ -231,6 +274,9 @@ void LDAP_parser::search_entry() {
     }        
 }
 
+/** SearchResDone generator/sender
+ * Generates and sends SearchResDone
+**/
 void LDAP_parser::search_res_done() {
     string res = {0x0A, 0x01, 0x00, 0x04, 0x00, 0x04, 0x00};
     res = cn(0x65) + make_ll(res);

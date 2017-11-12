@@ -1,5 +1,16 @@
+/**
+ * ber_functions.cc
+ * LDAP server - ISA 2017/2018
+ * Author: Ondrej Kurak
+ * Mail: xkurak00@stud.fit.vutbr.cz
+ **/
+
 #include "ldap_fsm.h"
 
+/** Loads LL 
+ * Loads length of message from actual ch
+ * @return length of message
+**/
 int LDAP_parser::get_ll() {
     int tmp = ch;
     if (tmp || act != message.length + 1)
@@ -16,6 +27,10 @@ int LDAP_parser::get_ll() {
     return num;
 }
 
+/** Loads message ID
+ * Loads int from actual ch
+ * @return ID of message
+*/
 int LDAP_parser::get_int() {
     int tmp = ch;
     if (tmp < 1 || tmp > 4)
@@ -29,6 +44,11 @@ int LDAP_parser::get_int() {
     return id;
 }
 
+/** Loads string
+ * Loads string, starts by using make_ll
+ * to get length of string, then loads it
+ * @return loaded string
+*/
 string LDAP_parser::get_string() {
     int len = get_ll();
     string text = "";
@@ -39,6 +59,21 @@ string LDAP_parser::get_string() {
     return text;
 }
 
+/** Transformation from char to str
+ * Transforms unsigned char to str
+ * @param character
+ * @return string(1, ch)
+*/
+string LDAP_parser::cn(unsigned char ch) {
+    string tmp(1, ch);
+    return tmp;
+}
+
+/** Generating string with LL
+ * Generates string in LL+string form
+ * @param string
+ * @return LL+string
+*/
 string LDAP_parser::make_ll(string str) {
     string result = "";
     unsigned int len = str.length();
@@ -62,6 +97,11 @@ string LDAP_parser::make_ll(string str) {
     return result;
 }
 
+/** Generating string from ID
+ * Generates string from ID
+ * @param ID
+ * @return string from ID
+*/
 string LDAP_parser::make_id(int num) {
     string result = "";
     int tmp = ceil((int)(log2(num) + 1) / 7.0);
@@ -73,9 +113,4 @@ string LDAP_parser::make_id(int num) {
             result += r;
     }
     return result;
-}
-
-string LDAP_parser::cn(unsigned char ch) {
-    string tmp(1, ch);
-    return tmp;
 }

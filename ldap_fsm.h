@@ -1,22 +1,33 @@
+/**
+ * ldap_fsm.h
+ * LDAP server - ISA 2017/2018
+ * Author: Ondrej Kurak
+ * Mail: xkurak00@stud.fit.vutbr.cz
+ **/
+
+#include <string.h>
+#include <unistd.h>
+#include <math.h>
+
 #include <iostream>
 #include <vector>
 #include <fstream>
 #include <map>
 #include <regex>
 #include <set>
-#include <string.h>
-#include <unistd.h>
-#include <math.h>
 
-
-/* Debugovacie makro, make debug */
+/**
+ * Macro for debuging (make debug) 
+ **/
 #ifdef NDEBUG
     #define DEBUG 1
 #else
     #define DEBUG 0
 #endif
 
-/* ProtokolOp */
+/**
+ *  ProtokolOp macros
+ **/
 #define BINDREQUEST 0x60
 #define BINDRESPONSE 0x61
 #define SEARCHREQEST 0x63
@@ -24,7 +35,9 @@
 #define SEARCHRESULTDONE 0x65
 #define UNBINDREQUEST 0x42
 
-/* Filter */
+/**
+ * Filter macros 
+ **/
 #define AND 0xA0
 #define OR 0xA1
 #define NOT 0xA2
@@ -34,163 +47,168 @@
 using namespace std;
 using namespace std::regex_constants;
 
-/* Trieda pre ukladanie udajov o LDAP sprave */
+/** LDAP Message
+ * Class for storing LDAP message
+ **/
 class LDAP_message {
 public:
-    int id; /* ID spravy */
-    int length; /* Dlzka spravy */
-    int size_limit; /* Maximalny pocet vratenych vysledkov */
-    int time_limit; /* Max cas pre spracovanie, neimplementovane */
-    int type; /* Typ LDAP spravy*/
-    int version; /* Verzia LDAP */
+    int id; /**< Message ID **/
+    int length; /**< Length of message**/
+    int size_limit; /**< Maximal number of results (0=all) **/
+    int time_limit; /**< Maximal time for sending (0=none) **/
+    int type; /**< Type of LDAP message**/
+    int version; /**< Version of LDAP **/
 };
 
-/* Trieda pre ukladanie stromov struktury LDAP filtrov */
+/** LDAP Filter
+ * Class for storing LDAP filters in tree like structure
+**/
 class Filter {
 public:
-    int type = -1; /* Typ filtra */
-    int length; /* Dlzka obsahu filtra */
-    vector<Filter> filters; /* Zoznam podfilrov */
-    /* Mapa pre cislovanie poloziek csv suboru */
-    map<string, int> known = {{"cn", 0}, {"CommonName", 0},
-                              {"uid", 1}, {"UserID", 1},
+    int type = -1; /**< Filter type **/
+    int length; /**< Length of filter (num of char) **/
+    vector<Filter> filters; /**< Stored subfilters **/
+    /**< Map for names of AttrDesc **/
+    map<string, int> known = {{"cn", 0}, {"commonname", 0},
+                              {"uid", 1}, {"userid", 1},
                               {"mail", 2}};
-    string what; /* Nazov stlpca */
-    int w; /* index stlpca */
-    string value; /* Hodnota na vyhladavanie */
+    string what; /**< AttrDesc **/
+    int w; /**< Index of AttrDesc **/
+    string value; /**< AttrValue **/
 };
 
-/* Trieda pre spracovavanie a odosielanie LDAP sprav */
+/** LDAP parser
+ * Class for parsing and generating LDAP messages
+**/
 class LDAP_parser {
 public:
-    /* Konstruktor
-    Vytvori a inicializuje triedu
-
-    Parametre:
-        int newfd - file descriptor z ktoreho ma citat/posielat
-        set<vector<string>> d - data nad ktorymi operuje
-    */
+    /** Constructor
+    * Initialization of LDAP_parser.
+    * @param newfd file descriptor
+    * @param d data with cn, uid, mail
+    **/
     LDAP_parser(int newfd, set<vector<string>> d);
 
-    /* Prejdenie spolocnim zaciatkom LDAP sprav
-    Prejde cez zaciatok, ktory zdielaju vsetky LDAP spravy.
-    nasledne zavola spravu podla ProtocolOp.
-    */
+    /** Start of parsing
+     * Starts parsing common part of LDAP messages
+     * @return true if successful
+    **/
     bool start();
 
 private:
-    int act; /* aktualna pozicia v sprave */
-    int fd; /* file descriptor socketu*/
-    unsigned char ch; /* aktualne spracovavany byte */
-    set<vector<string>> data; /* data z vstupneho suboru */
-    set<vector<string>> res_set; /* vysledok po aplikovani filtrov */
-    Filter filter; /* Filtre v stromovej strukture */
-    LDAP_message message; /* Udaje o aktualne sprave */
+    int act; /**< Possition in message**/
+    int fd; /**< File descriptor **/
+    unsigned char ch; /**< Actual byte from message **/
+    set<vector<string>> data; /**< Data from input file**/
+    set<vector<string>> res_set; /**< Result of application of filters **/
+    Filter filter; /**< Stored filters**/
+    LDAP_message message; /**< Message informations**/
 
-    /* Citanie dalsieho znaku
-    Precita nasledujuci znak do ch, zvacsi act.
-    */
+    /** Next char of message
+     * Reads next char from message and inc act
+    **/
     void next();
 
-    /* Vycistenie LDAP_parser
-    Vycisti ch a nastavi act na -1.
-    */
+    /** Clear parser
+     * Sets ch = 0 and atc = -1
+    **/
     void clear();
 
-    /* Spracovanie BindRequest
-    Spracuje BindRequest, pokial je to sprava typu BindRequest,
-    odosle prislusny BindResponse.
-
-    Navratova hodnota:
-        bool - true pokial sprava splna BindRequest, false inak.
-    */
+    /** BindRequest parsing
+     * Verification of BindReqest, sends BindResponse
+     * @return true if successful
+    **/
     bool bind_req();
 
-    /* Spracovanie SearchRequest
-    Spracuje SearchRequest, precita a ulozi filre do filter.
-    Ak vsetko prebehlo v poriadku vyfiltruje vysledky, pre kazdy zaznam
-    posle SearchEntry a nasledne SearchResDone
-
-    Navratova hodnota:
-        bool - true ak sprava je SearchRequest, false inak
-    */
+    /** SearchRequest parsing
+     * Verification of SearchRequest and filtes.
+     * Resolve filtes and sends SearchResEntry
+     * for every result in res_set and SearchResDone.
+     * @return true if successful
+    **/
     bool search_req();
 
-    /* Spracovanie UnBindRequest
-    Spracovanie UnBindRequest
-
-    Navratova hodnota:
-        bool - false ak je to sprava UnBindRequest
-    */
+    /** UnBindRequest parsing
+     * Verification of UnBindRequest 
+     * @return false ending connection
+    **/
     bool unbind_req();
 
-    /* Spracovanie BindResponse
-    Vytvorenie a odoslanie BindResponse
-    */
+    /** BindResponse generator/sender
+     * Generates and sends BindResponse
+    **/
     void bind_response();
 
-    /* Spracovanie SearchResEntry
-    Vytvore a odoslanie SearchResEntry pre kazdy vysledok v res_set
-    */
-    void search_entry();
+    /** SearchResEntry generator/sender
+     * Generates and sends SearchResEntry for
+     * every result in res_set
+    **/
+    void search_res_entry();
 
-    /* Spracovanie SearchResDone
-    Vytvorenie a odoslanie SearchResDone
-    */
+    /** SearchResDone generator/sender
+     * Generates and sends SearchResDone
+    **/
     void search_res_done();
 
 
-    /* ber_functions.cc */
+    /** ber_functions.cc **/
 
-    /* Ziskanie LL
-    Zoberie aktualne ch, podla jeho hodnoty korektne nacita
-    hodnotu dlzky
-
-    Navratova hodnota:
-        int - dlzka nasledujucej casti spravy/retazca
-    */
+    /** Loads LL 
+     * Loads length of message from actual ch
+     * @return length of message
+    **/
     int get_ll();
 
-    /* Ziskanie ID
-    Zoberie aktualne ch, podla jeho velkosti zoberie
-    nasledujuce byty a vytvori z nich ID
-
-    Navratova hodnota:
-        int - ID spravy
+    /** Loads message ID
+     * Loads int from actual ch
+     * @return ID of message
     */
     int get_int();
 
-    /* Ziskanie retazca
-    Podla aktualneho ch, za pomoci get_ll() nacita retazec
-
-    Navratova hodnota:
-        string - nacitany retazec
+    /** Loads string
+     * Loads string, starts by using make_ll
+     * to get length of string, then loads it
+     * @return loaded string
     */
     string get_string();
 
-    /* Premena unsigned char na retazec
-    Zoberie unsigned char a vrati retazec o velkosti 1
-
-    Navratova hodnota:
-        string - hodnota ch o velkosti 1
+    /** Transformation from char to str
+     * Transforms unsigned char to str
+     * @param character
+     * @return string(1, ch)
     */
     string cn(unsigned char ch);
 
-    /* Vytvorenie retazca s dlzkou v tvare ll
-    Podla zadaneho retazca mu vytvori predponu s velkostou v tvare ll
-
-    Parametre:
-        string str - vstpny retazec
-    Navratova hodnota:
-        string - retazec s predponou LL
-
+    /** Generating string with LL
+     * Generates string in LL+string form
+     * @param string
+     * @return LL+string
     */
     string make_ll(string str);
+
+    /** Generating string from ID
+     * Generates string from ID
+     * @param ID
+     * @return string from ID
+    */
     string make_id(int num);
 
-    /* filters.cc */
-    Filter get_filter();
-    void print_filters(Filter f);
-    set<vector<string>> resolve_filters(Filter f);
+    /**< filters.cc **/
 
+    /** Loading of filter
+     * Recursive loading filtes to tree like structure
+     * @return Tree like structure of filters
+    */
+    Filter get_filter();
+
+    /** Printing filters
+     * Prints all filters
+    */
+    void print_filters(Filter f);
+
+    /** Resolving filters
+     * Recursively resolves all filters in Filter
+     * @return entrys for filter
+    */
+    set<vector<string>> resolve_filters(Filter f);
 };

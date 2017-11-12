@@ -1,6 +1,17 @@
+/**
+ * filters.cc
+ * LDAP server - ISA 2017/2018
+ * Author: Ondrej Kurak
+ * Mail: xkurak00@stud.fit.vutbr.cz
+ **/
+
 #include "ldap_fsm.h"
 
 
+/** Loading of filter
+ * Recursive loading filtes to tree like structure
+ * @return Tree like structure of filters
+*/
 Filter LDAP_parser::get_filter() {
     Filter f;
     f.type = ch;
@@ -102,6 +113,9 @@ Filter LDAP_parser::get_filter() {
     return f;
 }
 
+/** Printing filters
+ * Prints all filters
+*/
 void LDAP_parser::print_filters(Filter f) {
     switch (f.type) {
         case EQUALITY:
@@ -130,6 +144,10 @@ void LDAP_parser::print_filters(Filter f) {
     }
 }
 
+/** Resolving filters
+ * Recursively resolves all filters in Filter
+ * @return entrys for filter
+*/
 set<vector<string>> LDAP_parser::resolve_filters(Filter f) {
     set<vector<string>> result;
     if (f.type == EQUALITY || f.type == SUBSTRING) {
