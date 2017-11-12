@@ -1,10 +1,12 @@
 # ISA - LDAP server
-Implementacia jednoducheho, paralelneho LDAP serveru.
+Implementacia jednoducheho, konkurentneho LDAP serveru.
 Server podporuje LDAPv2 (simple bind).
 Server podporuje spravy BindRequest, SearchRequest, UnBindRequest. Ine spravy su ingnorovane, a spojenie je ukoncene.
 Server odpoveda spravamy BindResponse, SearchResEntry, SearchResDone.
 Pre server nie je potrebne aby komunikacia zacala spravou BindRequest.
-Viac informaci: manual.pdf, RFC: 2251, 2252, 2254, 4511.
+Spravy nie su case sensitive (vid. manual.pdf). V SearchResEntry sa odosle cn, uid, mail. 
+
+Viac informaci: manual.pdf, RFC 4511.
 
 ### Podporovane filtre
 * And
@@ -15,6 +17,17 @@ Viac informaci: manual.pdf, RFC: 2251, 2252, 2254, 4511.
 
 ### Rozsirenia
 * utf-8 - narodne znaky 
+
+### Kompilacia
+```
+make
+```
+Makefile prepinace:
+
+* myldap - kompilacia programu, predvolene nastavenie
+* debug - kompilacia programu s debugovacim prepinacom
+* clean - odstranenie myldap
+* tar - zbalenie suborov pre odovzdanie
 
 ### Pouzitie
  ```
