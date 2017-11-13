@@ -34,7 +34,14 @@ Makefile prepinace:
  ./myldap {-p <port>} -f file
  ```
  * -p \<port\> - port pre server, bez zadanie je 389
- * -f file - subor s databazou 
+ * -f file - subor s databazou
+
+### Databazovy subor
+Kazdy riadok databazoveho suboru musi byt v tvare:
+```
+cn;uid;mail\n
+```
+Koniec riadku moze byt aj v tvare \r\n.
 
 ## Obsah archivu
 ### Zdrojove súbory
