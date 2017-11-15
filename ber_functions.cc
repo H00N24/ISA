@@ -13,8 +13,11 @@
 **/
 int LDAP_parser::get_ll() {
     int tmp = ch;
-    if (tmp || act != message.length + 1)
+    if (tmp || act != message.length + 1) {
         next();    
+    } else {
+        act++;
+    }
     if (tmp < 0x81) {
         return tmp;        
     }
@@ -22,7 +25,7 @@ int LDAP_parser::get_ll() {
     tmp -= 0x80;
     int num = 0;
     for (int i = 0; i < tmp; i++, next()) {
-        num += ch << ((tmp - 1 - i) * 7);
+        num += ch << ((tmp - 1 - i) * 8);
     }
     return num;
 }
@@ -82,13 +85,13 @@ string LDAP_parser::make_ll(string str) {
         num = len;
         result += num;
     } else {
-        int tmp = ceil((int)(log2(len) + 1) / 7.0);
+        int tmp = ceil((int)(log2(len) + 1) / 8.0);
         num = 0x80 + tmp;
         result += num;
         for (int i = 0; i < tmp; i++) {
             unsigned char r = 0;
-            r = len >> ((tmp - 1 - i) * 7);
-            r &= ~(1UL << 7);
+            r = len >> ((tmp - 1 - i) * 8);
+            //r &= ~(1UL << 7);
             result += r;
         }
     }
@@ -104,7 +107,7 @@ string LDAP_parser::make_ll(string str) {
 */
 string LDAP_parser::make_id(int num) {
     string result = "";
-    int tmp = ceil((int)(log2(num) + 1) / 7.0);
+    int tmp = ceil((int)(log2(num) + 1) / 8.0);
     unsigned char r = tmp;
     result += r;
     for (int i = 0; i < tmp; i++) {

@@ -110,13 +110,15 @@ bool LDAP_parser::bind_req() {
     string simple = get_string();
     if(DEBUG) cerr << "Simple: " << simple << endl;    
     
-    if (act == message.length + 1) {
+    if(DEBUG) cerr << "Act: " << act << endl;
+    if(DEBUG) cerr << "Mlen: " << message.length << endl;
+    if (act == message.length + 2) {
         bind_response();
         return true;
     }
     next();
 
-    if (ch == 0xA0 && act == message.length + 1) {
+    if (ch == 0xA0 && act == message.length + 2) {
         bind_response();
         return true;      
     }
@@ -207,21 +209,11 @@ bool LDAP_parser::search_req() {
             cerr << i[0] << " " << i[1] << " " << i[2] << endl; 
         }
     }
-    
-    if (act == message.length) {
-        search_res_entry();
-        search_res_done();
-        return true;
-    }
-    next();
+   
 
-    if (ch == 0xA0 && act == message.length) {
-        search_res_entry();
-        search_res_done();
-        return true;      
-    }
-
-    return false;
+    search_res_entry();
+    search_res_done();
+    return true;
 }
 
 /** UnBindRequest parsing
